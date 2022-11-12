@@ -1,0 +1,219 @@
+# --------------------------------------------------------------------------------------------------
+defaults:
+  - override hydra/sweeper: optuna
+  # - override hydra/sweeper/sampler: tpe
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+# --------------------------------------------------------------------------------------------------
+hydra:
+  sweeper:
+    sampler:
+      seed: 123
+      _target_: optuna.samplers.TPESampler
+      consider_prior: true
+      prior_weight: 1.0
+      consider_magic_clip: true
+      consider_endpoints: false
+      n_startup_trials: 10
+      n_ei_candidates: 24
+      multivariate: false
+      warn_independent_sampling: true
+    direction: maximize
+    study_name: ${exp.exp_name}
+    storage: null
+    n_trials: 50
+    n_jobs: 1
+
+    search_space:
+      param_model.loss.gamma_neg: 
+        type: int
+        low: 1
+        high: 5
+      param_model.loss.gamma_pos:
+        type: int
+        low: 0
+        high: 1
+      param_model.loss.clip:
+        type: float
+        low: 0.05
+        high: 0.15
+      
+
+# --------------------------------------------------------------------------------------------------
+# Paths
+path:
+    # model_directory: "models_cache/${run_name}"
+    data_directory: "./datasets"
+    official_data_directory: "/homes/ssd0/chadyang/Projects/Challenges/Physionet/cinc/scripts/PhysioNet-CinC-Challenges-2021/datasets/raw"
+    model_directory: None
+
+    # mlflow directory setting
+    # model_dir: "models/"
+    # sample_dir: "samples/"
+    # log_dir: "logs/"
+    mlflow_dir: "/mnt/sdh1/CMedia/Scripts/chadyang/mlruns/physionet/mlruns" # relative path to the project 
+
+
+
+
+# --------------------------------------------------------------------------------------------------
+# exp settings
+exp:
+    exp_name: "attn_rsn-classic-${param_loader.num_leads}leads"
+    # run_name: "mlp-hrv_0001"
+
+    # training parameters
+    # site: "all" # "all" or list: [WFDB_CPSC2018, WFDB_CPSC2018_2, WFDB_StPetersburg, WFDB_PTB, WFDB_PTBXL, WFDB_Ga, WFDB_ChapmanShaoxing, WFDB_Ningbo]
+    # sites: ["WFDB_CPSC2018","WFDB_CPSC2018_2","WFDB_StPetersburg","WFDB_PTB"]
+    train_sites: ["WFDB_CPSC2018", "WFDB_CPSC2018_2", "WFDB_PTBXL", "WFDB_Ga", "WFDB_Ningbo", "WFDB_ChapmanShaoxing"]
+    eval_sites: ["WFDB_CPSC2018", "WFDB_CPSC2018_2", "WFDB_PTBXL", "WFDB_Ga", "WFDB_Ningbo", "WFDB_ChapmanShaoxing"]
+    # train_sites: ["WFDB_CPSC2018"]
+    # eval_sites: ["WFDB_CPSC2018"]
+    # sites: "all"
+    ERASE_EXIST: True
+    N_fold: 5
+    N_fold_Order: 1 # order of the stratrification
+    N_fold_Use_Unscored: False # whether to join the unscored samples for joint training
+    random_state: 100
+    model_type: "attn_rsn_classic"
+
+    # For final test (submission)
+    top_N: 1 # choose top N models base on test_cm
+    overlap_size: 256 # the size for segmenting the test patches 
+    is_rule_base: False
+    
+# --------------------------------------------------------------------------------------------------
+# features & labels
+param_feature:
+    # hrv_nk2:
+    #     concat: True # whether concat all lead's features, currently only apply for hrv
+    #     fea_types: ["fea_demo", "hrv_time", "hrv_nonlin", "ecg_rate_func10", "ecg_quality_func10", "ecg_phase_comp_vent_func10", "ecg_phase_comp_atrial_func10"]
+        # fea_types: ['time', 'freq', 'nonlin', 'ECG_Rate', 'ECG_Quality', 'ECG_Phase_Completion_Atrial', 'ECG_Phase_Completion_Ventricular']
+        # time: False # whether save the
+    raw:
+        sr: 500
+        window: 10
+
+    num_cpu: -1 # number of cpus for feature extraction, -1 menas #processer -1
+    print_bar: True
+    save_single_pkl: False
+
+
+# preprocess
+param_preprocess:
+    impute: "median"
+    scaler: "zscore"
+
+
+# data laading / features
+param_loader:
+    num_leads: 6
+    leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF']
+    replace_eq: True # combine equivalent labels
+    num_workers: 8 # num_worker of pytorch dataloader
+    resample: "None" # "LPRUS", "LPROS", "None"
+
+
+# --------------------------------------------------------------------------------------------------
+# trainer param
+objective:
+  type: "val_auprc"
+  mode: "max"
+param_trainer:
+    max_epochs: 30
+    check_val_every_n_epoch: 1
+    progress_bar_refresh_rate: 5
+    gpus: "0"
+    amp_level: "O2"
+    gradient_clip_val: 0.5
+    # stochastic_weight_avg: True
+param_early_stop:
+    monitor: ${objective.type}
+    min_delta: 0.00
+    patience: 5
+    verbose: True
+    mode: ${objective.mode}
+param_swa:
+  swa_epoch_start: 0.6
+  annealing_epochs: 10
+
+
+# --------------------------------------------------------------------------------------------------
+param_aug:
+    ECG_THRE: 5
+    ECG_LEAD_DROP: 0.2
+    filter:
+        baseline:
+            cutoff: 0.6
+            sr: ${param_feature.raw.sr}
+            order: 2
+            filtertype: "highpass"
+        powerline50:
+            cutoff: 50
+            sr: ${param_feature.raw.sr}
+            order: 2
+            filtertype: "notch"
+        powerline60:
+            cutoff: 60
+            sr: ${param_feature.raw.sr}
+            order: 2
+            filtertype: "notch"
+
+
+    RandomLeadMask: 0
+    RandomShuflleLead: 0
+    RandomCrop: True
+
+# --------------------------------------------------------------------------------------------------
+#  model param
+param_model:
+    batch_size: 72
+    in_channel: ${param_loader.num_leads}
+    base_filters: 36
+    first_kernel_size: 19
+    kernel_size: 13
+    stride: 4
+    groups: ${param_loader.num_leads}
+    n_block: 12
+    n_demo: None
+    output_size: 26
+    num_heads: ${param_model.output_size}
+    emb_dim: 520
+    lr: 0.002668500693350078
+    # scheduler_WarmUp:
+    #     warmup: 1000
+    #     max_iters: 10000
+    sample_step: 1
+    model_save_step: 1
+    lambda_cal_l2: 0.01
+    is_class_weight: false
+    binary_thre_opt:
+        method: 1
+        n_trials: 2000
+        mp: true
+    is_se: true
+    bce_loss_type: None
+    is_cm_loss: false
+    n_mix_block: 2
+    mix_alpha: 1.9814278570359687
+
+    # asl loss
+    loss:
+        name: AsymmetricLossOptimized
+        gamma_neg: 3
+        gamma_pos: 0
+        clip: 0.05
+        disable_torch_grad_focal_loss: False # true_weight_decay: 1e-4 # 0.0001
+    # true_weight_decay: 1e-4 # 0.0001
+    # use_ema: 0.9997 # Exponential Moving Average
+
+# --------------------------------------------------------------------------------------------------
+logger:
+    param_ckpt:
+        # dirpath: ${model_directory}
+        monitor: ${objective.type}
+        filename: "{epoch:02d}-{${objective.type}:.3f}"
+        save_top_k: 1
+        mode: ${objective.mode}
+    log_lightning: False

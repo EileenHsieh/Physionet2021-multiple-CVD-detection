@@ -1,0 +1,25 @@
+# vs code
+.vscode
+
+# evaluation repo
+#lib/evaluation_2021
+
+# python cache 
+**/__pycache__
+
+# model related
+model_cache
+outputs
+
+# training logs
+*.log
+lightning_logs/
+mlruns/
+checkpoints/
+lightning_logs/
+multirun/
+
+# datasets
+datasets/raw/
+datasets/parsed/
+datasets/processed/

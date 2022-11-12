@@ -1,0 +1,153 @@
+# --------------------------------------------------------------------------------------------------
+# Paths
+path:
+    # model_directory: "models_cache/${run_name}"
+    data_directory: "./datasets"
+    official_data_directory: "../../cinc2021/datasets/raw"
+    model_directory: None
+
+    # mlflow directory setting
+    # model_dir: "models/"
+    # sample_dir: "samples/"
+    # log_dir: "logs/"
+    mlflow_dir: "./mlruns" # relative path to the project root
+
+
+
+# --------------------------------------------------------------------------------------------------
+# exp settings
+exp:
+    exp_name: "rsn-da-6leads"
+    # run_name: "mlp-hrv_0001"
+
+    # training parameters
+    # site: "all" # "all" or list: [WFDB_CPSC2018, WFDB_CPSC2018_2, WFDB_StPetersburg, WFDB_PTB, WFDB_PTBXL, WFDB_Ga, WFDB_ChapmanShaoxing, WFDB_Ningbo]
+    # sites: ["WFDB_CPSC2018","WFDB_CPSC2018_2","WFDB_StPetersburg","WFDB_PTB"]
+    train_sites: ["WFDB_CPSC2018", "WFDB_CPSC2018_2", "WFDB_PTBXL", "WFDB_Ga", "WFDB_Ningbo", "WFDB_ChapmanShaoxing"]
+    eval_sites: ["WFDB_CPSC2018", "WFDB_CPSC2018_2", "WFDB_PTBXL", "WFDB_Ga", "WFDB_Ningbo", "WFDB_ChapmanShaoxing"]
+    # train_sites: ["WFDB_CPSC2018"]
+    # eval_sites: ["WFDB_CPSC2018"]
+    # sites: "all"
+    ERASE_EXIST: True
+    N_fold: 5
+    N_fold_Order: 1 # order of the stratrification
+    N_fold_Use_Unscored: False # whether to join the unscored samples for joint training
+    random_state: 100
+    model_type: "rsn_vanilla"
+
+    # For final test (submission)
+    top_N: 1 # choose top N models base on test_cm
+    overlap_size: 256 # the size for segmenting the test patches 
+    is_rule_base: False
+    
+# --------------------------------------------------------------------------------------------------
+# features & labels
+param_feature:
+    # hrv_nk2:
+    #     concat: True # whether concat all lead's features, currently only apply for hrv
+    #     fea_types: ["fea_demo", "hrv_time", "hrv_nonlin", "ecg_rate_func10", "ecg_quality_func10", "ecg_phase_comp_vent_func10", "ecg_phase_comp_atrial_func10"]
+        # fea_types: ['time', 'freq', 'nonlin', 'ECG_Rate', 'ECG_Quality', 'ECG_Phase_Completion_Atrial', 'ECG_Phase_Completion_Ventricular']
+        # time: False # whether save the
+    raw:
+        sr: 500
+        window: 10
+
+    num_cpu: -1 # number of cpus for feature extraction, -1 menas #processer -1
+    print_bar: True
+    save_single_pkl: False
+
+
+# preprocess
+param_preprocess:
+    impute: "median"
+    scaler: "zscore"
+
+
+# data laading / features
+param_loader:
+    num_leads: 6
+    leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF']
+    replace_eq: True # combine equivalent labels
+    num_workers: 8 # num_worker of pytorch dataloader
+    resample: "None" # "LPRUS", "LPROS", "None"
+
+
+# --------------------------------------------------------------------------------------------------
+# trainer param
+objective:
+  type: "val_auprc"
+  mode: "max"
+param_trainer:
+    max_epochs: 100
+    check_val_every_n_epoch: 2
+    progress_bar_refresh_rate: 5
+    gpus: "0"
+    auto_lr_find: True
+    auto_scale_batch_size: "binsearch"
+param_early_stop:
+    monitor: ${objective.type}
+    min_delta: 0.00
+    patience: 5
+    verbose: True
+    mode: ${objective.mode}
+
+
+# --------------------------------------------------------------------------------------------------
+param_aug:
+    # RemoveBaselineWander:
+    #     cutoff: 0.05
+    BandPass:
+        cutoff: [3,45]
+    Rescale: "minmax" # zscore / minmax
+    RandomLeadMask: 0
+    RandomShuflleLead: 0
+    AddGaussianNoise:
+        mean: 0
+        std: 0.08
+    RandomCrop: True
+
+
+# --------------------------------------------------------------------------------------------------
+#  model param
+param_model:
+    batch_size: 108
+    #=== CNN ectractor
+    in_channel: 6
+    base_filters: 128
+    first_kernel_size: 11   # kernet size of the first convolution layer (default=15, ref: Challenge2020 No.2)
+    kernel_size: 5
+    stride: 3
+    groups: 2
+    n_block: 11
+    n_demo: None            # None or dimension of demographic data: age, gender
+    output_size: 26         # Final output dimension from classifier
+
+    #=== Training settings
+    lr: 0.0008
+    scheduler_WarmUp:
+        warmup: 1000
+        max_iters: 10000
+    # use_scheduler: False
+    sample_step: 1
+    model_save_step: 1
+    lambda_cal_l2: 0.01
+    is_class_weight: False
+    binary_thre_opt:
+        method: 1 # 1: rank 1 method / optuna / nevergrad
+        n_trials: 2000 # optuna: suggest 500 / nevergrad: suggest: 1000  
+        mp: True
+    is_se: True
+    bce_loss_type: None # None, "norm"
+    is_cm_loss: False
+    n_mix_block: 2
+    mix_alpha: 0.50375
+
+# --------------------------------------------------------------------------------------------------
+logger:
+    param_ckpt:
+        # dirpath: ${model_directory}
+        monitor: ${objective.type}
+        filename: "{epoch:02d}-{${objective.type}:.3f}"
+        save_top_k: 1
+        mode: ${objective.mode}
+    log_lightning: False
