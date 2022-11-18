@@ -1,3 +1,17 @@
+# Python code for the PhysioNet/Computing in Cardiology Challenge 2021.
+## Introduction
+The code contained in this repo is submitted to the PhysioNet/Computing in Cardiology Challenge 2021, where the goal is to detect multiple cardiovascular diseases. Please check out this paper for more details
+
+## Installation
+To build the programming environment, the docker image is provided.
+```
+# git clone this repo
+cd physionet2021 
+docker build -t physionet2021 . 
+```
+
+## Using the scripts
+###
 # Steps for running this code
 * Step 1: Build docker image
     ```
