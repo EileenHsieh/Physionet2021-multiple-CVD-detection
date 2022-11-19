@@ -1,6 +1,6 @@
-# Python code for the PhysioNet/Computing in Cardiology Challenge 2021.
+# Python code for PhysioNet/Computing in Cardiology Challenge 2021.
 ## Introduction
-The code contained in this repo is submitted to the PhysioNet/Computing in Cardiology Challenge 2021, where the goal is to detect multiple cardiovascular diseases. Please check out this paper for more details
+The code contained in this repo is submitted to the PhysioNet/Computing in Cardiology Challenge 2021, where the goal is to detect multiple cardiovascular diseases. Please check out this [paper](https://arxiv.org/abs/2204.13917) for more details.
 
 ## Installation
 To build the programming environment, the docker image is provided.
@@ -34,7 +34,7 @@ docker build -t physionet2021 .
     mkdir model test_data test_outputs 
     ```
 
-* Step 3: Build docker container
+* Step 4: Build docker container
 
     You can mount your local physionet2021 repo to the container, so that when there is any change in your local repo, it'll be sync in the container also.
 
@@ -42,7 +42,7 @@ docker build -t physionet2021 .
     docker run --gpus=all --shm-size=65g --name=physionet -p 9180-9185:9180-9185 -it -v [LOCAL PATH TO REPO]:/workspace/physionet physionet2021 bash 
     ```
 
-* Step 4: Train the models for 12 leads, 6 leads, 4 leads, 3 leads and 2 leads ECG in sequence.
+* Step 5: Train the models for 12 leads, 6 leads, 4 leads, 3 leads and 2 leads ECG in sequence.
 
     Given the datasets and the empty folder for saving the trained model, the `train_model.py` script will follow the config file to train the 12/6/4/3/2 lead models one by one and output the models to the `model` folder. The config files are in `config` folder, where there are 10 entries for different modeling pipeline. The entry 1, 5, 9 is the SERsn+M, SERsn+M, SERsn+M mentioned in the [paper](https://arxiv.org/pdf/2204.13917.pdf), respectively. 
 
@@ -50,7 +50,7 @@ docker build -t physionet2021 .
     python train_model.py datasets model
     ```
 
-* Step 5: Inference stage
+* Step 6: Inference stage
 
     The inference stage makes used of the trained model that is saved in `model` and test on the given test data in `test_data` folder. The inference is doing sample by sample, besides, it will detect the number of leads of each test samples and apply the corresponding model. The output of the inference code is saved in `test_outputs` folder created before. Each of the test samples will be saved individually as a csv file, with three information inside: classes, predicted label and predicted probability.
 
